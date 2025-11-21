@@ -13,7 +13,7 @@
  * 
  * Collaborators: None
  * Other Sources: ChatGPT, MySQL Connector/C++ documentation, Stack Overflow
- * Author: [Your Full Name]
+ * Author: Hameem Mohammed
  * Creation Date: November 20, 2025
  */
 
@@ -42,11 +42,99 @@ void executeQuery10(sql::Connection* con);
 void executeQuery11(sql::Connection* con);
 void executeQuery12(sql::Connection* con);
 
+// Create/drop tables for Assignment 7
+void createTables(sql::Connection* con);
+
 // Helper function to print section headers
 void printQueryHeader(int queryNum, const string& description) {
     cout << "\n" << string(80, '=') << "\n";
     cout << "Query " << queryNum << ": " << description << "\n";
     cout << string(80, '=') << "\n";
+}
+
+// Create the 5 tables with *7 suffix matching the provided .SQL schemas
+void createTables(sql::Connection* con) {
+    try {
+        sql::Statement* stmt = con->createStatement();
+
+        // Drop child tables first, then parents, to avoid foreign key dependency issues
+        stmt->execute("DROP TABLE IF EXISTS Enrollment7");
+        stmt->execute("DROP TABLE IF EXISTS Offering7");
+        stmt->execute("DROP TABLE IF EXISTS Course7");
+        stmt->execute("DROP TABLE IF EXISTS Faculty7");
+        stmt->execute("DROP TABLE IF EXISTS Student7");
+
+        // Student7 table (matches Student schema from student.SQL)
+        stmt->execute(
+            "CREATE TABLE Student7 ("
+            " StdNo CHAR(11) PRIMARY KEY,"
+            " StdFirstName VARCHAR(50),"
+            " StdLastName VARCHAR(50),"
+            " StdCity VARCHAR(50),"
+            " StdState CHAR(2),"
+            " StdZip CHAR(10),"
+            " StdMajor CHAR(6),"
+            " StdClass CHAR(6),"
+            " StdGPA DECIMAL(3,2) DEFAULT 0"
+            ")"
+        );
+
+        // Faculty7 table (matches Faculty schema from faculty.SQL)
+        stmt->execute(
+            "CREATE TABLE Faculty7 ("
+            " FacNo CHAR(11) PRIMARY KEY,"
+            " FacFirstName VARCHAR(30),"
+            " FacLastName VARCHAR(30),"
+            " FacCity VARCHAR(30),"
+            " FacState CHAR(2),"
+            " FacDept CHAR(10),"
+            " FacRank CHAR(4),"
+            " FacSalary DECIMAL(10,2),"
+            " FacSupervisor CHAR(11),"
+            " FacHireDate DATE,"
+            " FacZipCode CHAR(10)"
+            ")"
+        );
+
+        // Course7 table (matches Course schema from course.SQL)
+        stmt->execute(
+            "CREATE TABLE Course7 ("
+            " CourseNo CHAR(6) PRIMARY KEY,"
+            " CrsDesc VARCHAR(50),"
+            " CrsUnits INTEGER"
+            ")"
+        );
+
+        // Offering7 table (matches Offering schema from offering.SQL)
+        stmt->execute(
+            "CREATE TABLE Offering7 ("
+            " OfferNo INTEGER PRIMARY KEY,"
+            " CourseNo CHAR(6),"
+            " OffTerm CHAR(6),"
+            " OffYear INTEGER,"
+            " OffLocation VARCHAR(30),"
+            " OffTime VARCHAR(10),"
+            " FacNo CHAR(11),"
+            " OffDays CHAR(6) DEFAULT 'MW'"
+            ")"
+        );
+
+        // Enrollment7 table (matches Enrollment schema from enrollment.SQL)
+        stmt->execute(
+            "CREATE TABLE Enrollment7 ("
+            " OfferNo INTEGER,"
+            " StdNo CHAR(11),"
+            " EnrGrade DECIMAL(3,2),"
+            " PRIMARY KEY (OfferNo, StdNo)"
+            ")"
+        );
+
+        delete stmt;
+    }
+    catch (sql::SQLException& e) {
+        cerr << "Error creating tables: " << e.what() << "\n";
+        throw;
+    }
 }
 
 int main() {
@@ -55,15 +143,18 @@ int main() {
         sql::mysql::MySQL_Driver* driver = sql::mysql::get_mysql_driver_instance();
         
         // Establish connection to MySQL server using provided credentials
-        // Replace password with your real MySQL password
+        // >>>>> CHANGE PASSWORD STRING BELOW TO YOUR REAL MYSQL PASSWORD <<<<<
         sql::Connection* con = driver->connect(
             "tcp://mysql.eecs.ku.edu:3306",
             "348f25_h273m190",
-            "DJswamp@123"
+            "YOUR_MYSQL_PASSWORD_HERE"
         );
         
         // Select the specific database to query
         con->setSchema("348f25_h273m190");
+
+        // Create the Assignment 7 tables (drop if they already exist)
+        createTables(con);
         
         // Execute each of the 12 required queries sequentially
         executeQuery1(con);
@@ -101,20 +192,18 @@ void executeQuery1(sql::Connection* con) {
     printQueryHeader(1, "Retrieve all student information for those whose major is 'IS'");
     
     try {
-        // Create statement object to execute SQL query
         sql::Statement* stmt = con->createStatement();
         
-        // Execute SELECT query filtering by IS major
-        sql::ResultSet* res = stmt->executeQuery("SELECT * FROM Student7 WHERE StdMajor = 'IS'");
+        sql::ResultSet* res = stmt->executeQuery(
+            "SELECT * FROM Student7 WHERE StdMajor = 'IS'"
+        );
         
-        // Print column headers for result set
         cout << left << setw(12) << "Std No" << setw(15) << "First Name" 
              << setw(15) << "Last Name" << setw(15) << "City" << setw(6) << "State" 
              << setw(12) << "Major" << setw(8) << "Class" << setw(6) << "GPA" 
              << "Zip Code\n";
         cout << string(95, '-') << "\n";
         
-        // Iterate through result set and display each row
         while (res->next()) {
             cout << left << setw(12) << res->getString("StdNo")
                  << setw(15) << res->getString("StdFirstName")
@@ -127,7 +216,6 @@ void executeQuery1(sql::Connection* con) {
                  << res->getString("StdZip") << "\n";
         }
         
-        // Clean up result set and statement resources
         delete res;
         delete stmt;
     }
@@ -143,17 +231,14 @@ void executeQuery2(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query using GROUP BY to count enrollments per student, HAVING to filter
         sql::ResultSet* res = stmt->executeQuery(
-            "SELECT StdNo, COUNT(*) as EnrollmentCount FROM Enrollment7 "
+            "SELECT StdNo, COUNT(*) AS EnrollmentCount FROM Enrollment7 "
             "GROUP BY StdNo HAVING COUNT(*) > 2"
         );
         
-        // Print column headers
         cout << left << setw(15) << "Student No" << "Enrollment Count\n";
         cout << string(30, '-') << "\n";
         
-        // Display each student with more than 2 enrollments
         while (res->next()) {
             cout << left << setw(15) << res->getString("StdNo")
                  << res->getInt("EnrollmentCount") << "\n";
@@ -174,17 +259,15 @@ void executeQuery3(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Employees hired in 2010 or earlier have 15+ years of service as of 2025
+        // Include those hired in 2010 or earlier: YEAR(FacHireDate) <= 2010
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT FacFirstName, FacLastName FROM Faculty7 "
             "WHERE YEAR(FacHireDate) <= 2010"
         );
         
-        // Print column headers
         cout << left << setw(20) << "First Name" << "Last Name\n";
         cout << string(40, '-') << "\n";
         
-        // Display each professor meeting the criteria
         while (res->next()) {
             cout << left << setw(20) << res->getString("FacFirstName")
                  << res->getString("FacLastName") << "\n";
@@ -205,17 +288,14 @@ void executeQuery4(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query filtering by SUMMER term and 2020 year
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT DISTINCT CourseNo FROM Offering7 "
             "WHERE OffTerm = 'SUMMER' AND OffYear = 2020"
         );
         
-        // Print column header
         cout << "Course Number\n";
         cout << string(15, '-') << "\n";
         
-        // Display each course offered in Summer 2020
         while (res->next()) {
             cout << res->getString("CourseNo") << "\n";
         }
@@ -235,16 +315,15 @@ void executeQuery5(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query filtering by specific ZIP code (98114)
+        // Match any ZIP that starts with 98114 (e.g., 98114-1332)
         sql::ResultSet* res = stmt->executeQuery(
-            "SELECT FacFirstName, FacLastName FROM Faculty7 WHERE FacZip = '98114'"
+            "SELECT FacFirstName, FacLastName FROM Faculty7 "
+            "WHERE FacZipCode LIKE '98114%'"
         );
         
-        // Print column headers
         cout << left << setw(20) << "First Name" << "Last Name\n";
         cout << string(40, '-') << "\n";
         
-        // Display professors in specified ZIP code
         while (res->next()) {
             cout << left << setw(20) << res->getString("FacFirstName")
                  << res->getString("FacLastName") << "\n";
@@ -265,18 +344,18 @@ void executeQuery6(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query ordering by GPA descending and limiting to second row
         sql::ResultSet* res = stmt->executeQuery(
-            "SELECT DISTINCT StdGPA FROM Student7 ORDER BY StdGPA DESC LIMIT 1, 1"
+            "SELECT DISTINCT StdGPA FROM Student7 "
+            "ORDER BY StdGPA DESC LIMIT 1, 1"
         );
         
-        // Print column header
         cout << "Second-Highest GPA\n";
         cout << string(20, '-') << "\n";
         
-        // Display the second-highest GPA value
         if (res->next()) {
             cout << fixed << setprecision(2) << res->getDouble("StdGPA") << "\n";
+        } else {
+            cout << "Not enough distinct GPA values.\n";
         }
         
         delete res;
@@ -294,18 +373,15 @@ void executeQuery7(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query using inner join to find matching names
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT s.StdFirstName, s.StdLastName FROM Student7 s "
             "INNER JOIN Faculty7 f ON s.StdFirstName = f.FacFirstName "
             "AND s.StdLastName = f.FacLastName"
         );
         
-        // Print column headers
         cout << left << setw(20) << "First Name" << "Last Name\n";
         cout << string(40, '-') << "\n";
         
-        // Display individuals appearing in both tables
         while (res->next()) {
             cout << left << setw(20) << res->getString("StdFirstName")
                  << res->getString("StdLastName") << "\n";
@@ -326,21 +402,18 @@ void executeQuery8(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query using LEFT JOIN to include students with no enrollments
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT s.StdNo, s.StdFirstName, s.StdLastName, "
-            "       COUNT(e.StdNo) AS CourseCount "
+            "       COUNT(e.OfferNo) AS CourseCount "
             "FROM Student7 s "
             "LEFT JOIN Enrollment7 e ON s.StdNo = e.StdNo "
             "GROUP BY s.StdNo, s.StdFirstName, s.StdLastName"
         );
         
-        // Print column headers
         cout << left << setw(12) << "Std No" << setw(15) << "First Name" 
              << setw(15) << "Last Name" << "Course Count\n";
         cout << string(55, '-') << "\n";
         
-        // Display each student with their course enrollment count
         while (res->next()) {
             cout << left << setw(12) << res->getString("StdNo")
                  << setw(15) << res->getString("StdFirstName")
@@ -363,17 +436,14 @@ void executeQuery9(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query ordering by salary descending and limiting to top 3
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT FacFirstName, FacLastName, FacSalary FROM Faculty7 "
             "ORDER BY FacSalary DESC LIMIT 3"
         );
         
-        // Print column headers
         cout << left << setw(20) << "First Name" << setw(20) << "Last Name" << "Salary\n";
         cout << string(60, '-') << "\n";
         
-        // Display top 3 highest-paid faculty members
         while (res->next()) {
             cout << left << setw(20) << res->getString("FacFirstName")
                  << setw(20) << res->getString("FacLastName")
@@ -395,20 +465,17 @@ void executeQuery10(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute query using LEFT JOIN with NULL check to find students without enrollments
         sql::ResultSet* res = stmt->executeQuery(
             "SELECT s.* FROM Student7 s LEFT JOIN Enrollment7 e ON s.StdNo = e.StdNo "
             "WHERE e.StdNo IS NULL"
         );
         
-        // Print column headers
         cout << left << setw(12) << "Std No" << setw(15) << "First Name" 
              << setw(15) << "Last Name" << setw(15) << "City" << setw(6) << "State" 
              << setw(12) << "Major" << setw(8) << "Class" << setw(6) << "GPA" 
              << "Zip Code\n";
         cout << string(95, '-') << "\n";
         
-        // Display each student with no enrollment records
         while (res->next()) {
             cout << left << setw(12) << res->getString("StdNo")
                  << setw(15) << res->getString("StdFirstName")
@@ -436,7 +503,7 @@ void executeQuery11(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute INSERT statement to add new junior CS student
+        // Insert junior CS student Alice Smith
         stmt->execute(
             "INSERT INTO Student7 (StdNo, StdFirstName, StdLastName, StdCity, StdState, "
             "StdZip, StdMajor, StdClass, StdGPA) "
@@ -445,17 +512,14 @@ void executeQuery11(sql::Connection* con) {
         
         cout << "Insert successful!\n\n";
         
-        // Execute SELECT to display entire updated Student table
         sql::ResultSet* res = stmt->executeQuery("SELECT * FROM Student7");
         
-        // Print column headers
         cout << left << setw(12) << "Std No" << setw(15) << "First Name" 
              << setw(15) << "Last Name" << setw(15) << "City" << setw(6) << "State" 
              << setw(12) << "Zip" << setw(8) << "Major" << setw(8) << "Class" 
              << "GPA\n";
         cout << string(95, '-') << "\n";
         
-        // Display all rows including newly inserted record
         while (res->next()) {
             cout << left << setw(12) << res->getString("StdNo")
                  << setw(15) << res->getString("StdFirstName")
@@ -483,25 +547,22 @@ void executeQuery12(sql::Connection* con) {
     try {
         sql::Statement* stmt = con->createStatement();
         
-        // Execute UPDATE statement to change Bob Norbert's location
+        // Update BOB NORBERT to Overland Park, KS ZIP 66204
         stmt->execute(
             "UPDATE Student7 SET StdCity = 'Overland Park', StdZip = '66204' "
-            "WHERE StdFirstName = 'Bob' AND StdLastName = 'Norbert'"
+            "WHERE StdFirstName = 'BOB' AND StdLastName = 'NORBERT'"
         );
         
         cout << "Update successful!\n\n";
         
-        // Execute SELECT to display entire updated Student table
         sql::ResultSet* res = stmt->executeQuery("SELECT * FROM Student7");
         
-        // Print column headers
         cout << left << setw(12) << "Std No" << setw(15) << "First Name" 
              << setw(15) << "Last Name" << setw(15) << "City" << setw(6) << "State" 
              << setw(12) << "Zip" << setw(8) << "Major" << setw(8) << "Class" 
              << "GPA\n";
         cout << string(95, '-') << "\n";
         
-        // Display all rows with Bob Norbert's updated information
         while (res->next()) {
             cout << left << setw(12) << res->getString("StdNo")
                  << setw(15) << res->getString("StdFirstName")
